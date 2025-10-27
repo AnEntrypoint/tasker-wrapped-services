@@ -1,0 +1,35 @@
+{
+  "name": "tasker-wrapped-services",
+  "version": "1.0.0",
+  "description": "Runtime-agnostic wrapped services for tasker-sequential (Google APIs, keystore, database, etc.)",
+  "type": "module",
+  "main": "cli.js",
+  "exports": {
+    ".": "./cli.js"
+  },
+  "bin": {
+    "tasker": "./cli.js"
+  },
+  "scripts": {
+    "start": "node cli.js",
+    "start:deno": "deno run --allow-all cli.ts",
+    "start:bun": "bun cli.ts",
+    "discover": "node discover-services.js"
+  },
+  "keywords": [
+    "tasker",
+    "sequential",
+    "wrapped",
+    "services",
+    "runtime-agnostic"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "tasker-sequential": "*",
+    "tasker-adaptor": "*"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.7"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "tasks": {
+    "start": "deno run --allow-net --allow-env --allow-read --allow-write index.ts",
+    "deploy": "supabase functions deploy --no-verify-jwt ."
+  },
+  "permissions": {
+    "net": true,
+    "env": true,
+    "read": true,
+    "write": true,
+    "run": true
+  },
+  "importMap": "import_map.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window"],
+    "strict": true
+  }
+} 

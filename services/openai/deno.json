@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "jsr:@supabase/functions-js/": "jsr:@supabase/functions-js@0.0.5/",
+    "openai": "npm:openai@4.28.0",
+    "std/": "https://deno.land/std@0.208.0/"
+  },
+  "tasks": {
+    "serve": "deno run --allow-net --allow-env index.ts"
+  }
+} 

@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "google-auth-library": "npm:google-auth-library@^9",
+    "googleapis": "npm:googleapis@^133", 
+    "sdk-http-wrapper": "npm:sdk-http-wrapper@1.0.10"
+  }
+}
