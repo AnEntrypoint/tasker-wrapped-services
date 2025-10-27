@@ -1,6 +1,6 @@
 {
   "name": "tasker-wrapped-services",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Runtime-agnostic wrapped services for tasker-sequential (Google APIs, keystore, database, etc.)",
   "type": "module",
   "main": "cli.js",
