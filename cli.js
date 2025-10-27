@@ -44,12 +44,35 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
+// Find services directory by searching current directory and parents
+function findServicesDir() {
+  let current = process.cwd();
+  const root = path.parse(current).root;
+
+  while (current !== root) {
+    const servicesPath = path.join(current, 'services');
+    if (fs.existsSync(servicesPath) && fs.statSync(servicesPath).isDirectory()) {
+      return servicesPath;
+    }
+    current = path.dirname(current);
+  }
+
+  const fallbackPath = path.join(__dirname, 'services');
+  if (fs.existsSync(fallbackPath)) {
+    return fallbackPath;
+  }
+
+  return null;
+}
+
 // Discover available services
 function discoverServices() {
-  const servicesDir = path.join(__dirname, 'services');
+  const servicesDir = findServicesDir();
 
-  if (!fs.existsSync(servicesDir)) {
-    console.error('❌ Services directory not found:', servicesDir);
+  if (!servicesDir) {
+    console.error('❌ Services directory not found');
+    console.error('Please run this command in a directory or parent of a directory containing a services/ folder');
+    console.error('Expected structure: /path/to/project/services/{service-name}/index.ts');
     process.exit(1);
   }
 
@@ -101,10 +124,11 @@ function assignPorts(services) {
 }
 
 // Start services
-async function startServices(servicesList) {
+async function startServices(servicesList, servicesDir) {
   console.log('🚀 Starting Wrapped Services');
   console.log(`📦 Runtime: ${config.runtime}`);
   console.log(`🔧 Services: ${servicesList.map(s => s.name).join(', ')}`);
+  console.log(`📁 Services Dir: ${servicesDir}`);
   console.log('');
 
   const processes = [];
@@ -137,10 +161,11 @@ async function startServices(servicesList) {
   }
   console.log('─'.repeat(60));
 
-  // Create registry file for other processes
-  const registryPath = path.join(__dirname, '.service-registry.json');
+  // Create registry file in the current working directory
+  const registryPath = path.join(process.cwd(), '.service-registry.json');
   fs.writeFileSync(registryPath, JSON.stringify({
     timestamp: new Date().toISOString(),
+    servicesDir: servicesDir,
     services: processes
   }, null, 2));
 
@@ -158,6 +183,7 @@ async function startServices(servicesList) {
 
 // Main
 async function main() {
+  const servicesDir = findServicesDir();
   const allServices = discoverServices();
   const filtered = filterServices(allServices);
   const assigned = assignPorts(filtered);
@@ -167,7 +193,7 @@ async function main() {
     process.exit(1);
   }
 
-  await startServices(assigned);
+  await startServices(assigned, servicesDir);
 }
 
 main().catch(err => {
