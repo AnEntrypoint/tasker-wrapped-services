@@ -19,6 +19,175 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Boilerplate service templates
+const boilerplateServices = {
+  'hello-world': {
+    'index.ts': `import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+export async function handler(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const path = url.pathname;
+
+  if (path === "/health") {
+    return new Response(JSON.stringify({ status: "ok", service: "hello-world" }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  if (req.method === "POST" && path === "/call") {
+    const body = await req.json();
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Hello from hello-world service!",
+      received: body
+    }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  return new Response(JSON.stringify({ error: "Not found" }), {
+    status: 404,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+if (import.meta.main) {
+  const port = parseInt(Deno.env.get("PORT") || "3000");
+  serve(handler, { port });
+}
+`
+  },
+  'echo-service': {
+    'index.ts': `import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+export async function handler(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const path = url.pathname;
+
+  if (path === "/health") {
+    return new Response(JSON.stringify({ status: "ok", service: "echo-service" }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  if (req.method === "POST" && path === "/call") {
+    const body = await req.json();
+    return new Response(JSON.stringify({
+      success: true,
+      echo: body,
+      timestamp: new Date().toISOString()
+    }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  return new Response(JSON.stringify({ error: "Not found" }), {
+    status: 404,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+if (import.meta.main) {
+  const port = parseInt(Deno.env.get("PORT") || "3000");
+  serve(handler, { port });
+}
+`
+  },
+  'api-gateway': {
+    'index.ts': `import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+export async function handler(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const path = url.pathname;
+
+  if (path === "/health") {
+    return new Response(JSON.stringify({ status: "ok", service: "api-gateway" }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  if (req.method === "POST" && path === "/call") {
+    const body = await req.json();
+    const { endpoint, method = "GET", data } = body;
+
+    try {
+      const fetchOptions: RequestInit = {
+        method: method,
+        headers: { "Content-Type": "application/json" }
+      };
+
+      if (data) {
+        fetchOptions.body = JSON.stringify(data);
+      }
+
+      const response = await fetch(endpoint, fetchOptions);
+      const responseData = await response.json();
+
+      return new Response(JSON.stringify({
+        success: true,
+        status: response.status,
+        data: responseData
+      }), {
+        headers: { "Content-Type": "application/json" }
+      });
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  }
+
+  return new Response(JSON.stringify({ error: "Not found" }), {
+    status: 404,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
+if (import.meta.main) {
+  const port = parseInt(Deno.env.get("PORT") || "3000");
+  serve(handler, { port });
+}
+`
+  }
+};
+
+// Create boilerplate services in current directory
+function createBoilerplateServices() {
+  const servicesDir = path.join(process.cwd(), 'services');
+
+  if (fs.existsSync(servicesDir)) {
+    return servicesDir;
+  }
+
+  console.log('📦 Creating boilerplate services directory...\n');
+
+  fs.mkdirSync(servicesDir, { recursive: true });
+
+  for (const [serviceName, files] of Object.entries(boilerplateServices)) {
+    const serviceDir = path.join(servicesDir, serviceName);
+    fs.mkdirSync(serviceDir, { recursive: true });
+
+    for (const [fileName, content] of Object.entries(files)) {
+      const filePath = path.join(serviceDir, fileName);
+      fs.writeFileSync(filePath, content);
+    }
+
+    console.log(`✅ Created service: ${serviceName}`);
+  }
+
+  console.log(`\n📁 Services created at: ${servicesDir}\n`);
+  console.log('Each service has:');
+  console.log('  - /health endpoint for health checks');
+  console.log('  - /call endpoint for service calls');
+  console.log('  - Deno-compatible TypeScript implementation\n');
+
+  return servicesDir;
+}
+
 // Parse arguments
 const args = process.argv.slice(2);
 const config = {
@@ -49,6 +218,7 @@ function findServicesDir() {
   let current = process.cwd();
   const root = path.parse(current).root;
 
+  // First, search current and parent directories
   while (current !== root) {
     const servicesPath = path.join(current, 'services');
     if (fs.existsSync(servicesPath) && fs.statSync(servicesPath).isDirectory()) {
@@ -57,9 +227,13 @@ function findServicesDir() {
     current = path.dirname(current);
   }
 
-  const fallbackPath = path.join(__dirname, 'services');
-  if (fs.existsSync(fallbackPath)) {
-    return fallbackPath;
+  // Check if we're inside the tasker-wrapped-services package itself
+  const packageServicesPath = path.join(__dirname, 'services');
+  const cwd = process.cwd();
+  const iInsidePackage = cwd.includes(__dirname);
+
+  if (iInsidePackage && fs.existsSync(packageServicesPath)) {
+    return packageServicesPath;
   }
 
   return null;
@@ -67,13 +241,12 @@ function findServicesDir() {
 
 // Discover available services
 function discoverServices() {
-  const servicesDir = findServicesDir();
+  let servicesDir = findServicesDir();
 
   if (!servicesDir) {
-    console.error('❌ Services directory not found');
-    console.error('Please run this command in a directory or parent of a directory containing a services/ folder');
-    console.error('Expected structure: /path/to/project/services/{service-name}/index.ts');
-    process.exit(1);
+    console.log('⚠️  No services directory found');
+    servicesDir = createBoilerplateServices();
+    console.log('✅ Boilerplate created, discovering services...\n');
   }
 
   const services = {};
@@ -95,7 +268,7 @@ function discoverServices() {
     }
   }
 
-  return services;
+  return { services, servicesDir };
 }
 
 // Filter services based on config
@@ -183,8 +356,8 @@ async function startServices(servicesList, servicesDir) {
 
 // Main
 async function main() {
-  const servicesDir = findServicesDir();
-  const allServices = discoverServices();
+  const discovery = discoverServices();
+  const { services: allServices, servicesDir } = discovery;
   const filtered = filterServices(allServices);
   const assigned = assignPorts(filtered);
 
