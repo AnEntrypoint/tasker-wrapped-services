@@ -2,6 +2,8 @@
  * Utilities for formatting responses
  */
 
+import { nowISO } from 'tasker-utils/timestamps';
+
 /**
  * Safely stringify objects including handling of:
  * - Circular references
@@ -156,7 +158,7 @@ export function formatErrorResponse(error: string, logs?: string[]): StandardRes
  * Format a log message with ISO timestamp
  */
 export function formatLogMessage(level: string, message: string, context?: Record<string, unknown>): string {
-  const timestamp = new Date().toISOString();
+  const timestamp = nowISO();
   let formattedMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
   
   if (context && Object.keys(context).length > 0) {

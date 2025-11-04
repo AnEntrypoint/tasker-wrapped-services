@@ -4,6 +4,7 @@
  */
 
 import { serve, ConnInfo } from "https://deno.land/std@0.201.0/http/server.ts";
+import { nowISO } from 'tasker-utils/timestamps';
 
 // Standardized response interfaces
 export interface ApiResponse<T = any> {
@@ -79,7 +80,7 @@ export abstract class BaseHttpHandler {
     const response: ApiResponse<T> = {
       success: true,
       data,
-      timestamp: new Date().toISOString()
+      timestamp: nowISO()
     };
 
     if (logs && logs.length > 0) {
@@ -109,7 +110,7 @@ export abstract class BaseHttpHandler {
     const response: ApiResponse = {
       success: false,
       error: message,
-      timestamp: new Date().toISOString()
+      timestamp: nowISO()
     };
 
     if (logs && logs.length > 0) {
@@ -135,7 +136,7 @@ export abstract class BaseHttpHandler {
     const errorDetails = {
       context,
       type: error instanceof Error ? error.constructor.name : 'Unknown',
-      timestamp: new Date().toISOString()
+      timestamp: nowISO()
     };
 
     console.error(`[${this.constructor.name}] ${context}:`, error);
@@ -218,7 +219,7 @@ export function createSimpleHandler(
         JSON.stringify({
           success: false,
           error: errorMessage,
-          timestamp: new Date().toISOString()
+          timestamp: nowISO()
         }),
         {
           status: 500,
@@ -239,7 +240,7 @@ export function createHealthCheckResponse(serviceName: string, status: 'healthy'
     data: {
       service: serviceName,
       status,
-      timestamp: new Date().toISOString(),
+      timestamp: nowISO(),
       ...details
     }
   };

@@ -1,6 +1,7 @@
 import { supabaseClient } from "../config/supabase-config.ts";
 import { LOG_PREFIX_BASE } from "../utils/response-utils.ts";
 import { hostLog } from "../../_shared/utils.ts";
+import { nowISO } from 'tasker-utils/timestamps';
 
 export async function checkQueueBusy(baseUrl: string, serviceRoleKey: string): Promise<boolean> {
     try {
@@ -81,7 +82,7 @@ export async function executeStackRunSynchronously(stackRunId: string, baseUrl: 
             body: JSON.stringify({
                 status: 'completed',
                 result: result,
-                updated_at: new Date().toISOString()
+                updated_at: nowISO()
             })
         });
 
@@ -107,7 +108,7 @@ export async function executeStackRunSynchronously(stackRunId: string, baseUrl: 
                 body: JSON.stringify({
                     status: 'failed',
                     error: error instanceof Error ? error.message : String(error),
-                    updated_at: new Date().toISOString()
+                    updated_at: nowISO()
                 })
             });
         } catch (updateError) {
@@ -181,7 +182,7 @@ export async function triggerNextQueuedTask(baseUrl: string, serviceRoleKey: str
             },
             body: JSON.stringify({
                 status: 'running',
-                updated_at: new Date().toISOString()
+                updated_at: nowISO()
             })
         });
 
@@ -210,7 +211,7 @@ export async function triggerNextQueuedTask(baseUrl: string, serviceRoleKey: str
                 },
                 body: JSON.stringify({
                     status: 'pending',
-                    updated_at: new Date().toISOString()
+                    updated_at: nowISO()
                 })
             });
         } else {

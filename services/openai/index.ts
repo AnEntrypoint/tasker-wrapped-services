@@ -3,6 +3,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { BaseHttpHandler, HttpStatus, createHealthCheckResponse } from "../_shared/http-handler.ts";
 import { config } from "../_shared/config-service.ts";
 import { serviceRegistry } from "../_shared/service-registry.ts";
+import logger from 'tasker-logging';
+import { nowISO } from 'tasker-utils/timestamps';
 
 let cachedApiKey: string | null = null;
 
@@ -10,20 +12,20 @@ async function getOpenAIApiKey(): Promise<string> {
   if (cachedApiKey) return cachedApiKey;
 
   try {
-    console.log("[WrappedOpenAI] Attempting to fetch OpenAI API key from keystore...");
+    logger.info({ context: 'WrappedOpenAI', message: 'Attempting to fetch OpenAI API key from keystore' });
     const result = await serviceRegistry.call('keystore', 'getKey', ['global', 'OPENAI_API_KEY']);
 
     if (!result.success) {
-      console.error("[WrappedOpenAI] Failed to retrieve OPENAI_API_KEY from keystore:", result.error);
+      logger.error({ context: 'WrappedOpenAI', message: 'Failed to retrieve OPENAI_API_KEY from keystore', error: result.error });
       throw new Error('OpenAI API key not found in keystore.');
     }
 
     cachedApiKey = result.data;
-    console.log(`[WrappedOpenAI] Retrieved API key (starts with: ${cachedApiKey.substring(0, 5)}...).`);
+    logger.debug({ context: 'WrappedOpenAI', message: 'Retrieved API key', keyPrefix: cachedApiKey.substring(0, 5) });
     return cachedApiKey;
   } catch (error) {
-    console.error("[WrappedOpenAI] Error getting OpenAI API key:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ context: 'WrappedOpenAI', message: 'Error getting OpenAI API key', error: errorMessage });
     throw new Error(`Failed to get OpenAI API key: ${errorMessage}`);
   }
 }
@@ -34,14 +36,14 @@ class WrappedOpenAIHandler extends BaseHttpHandler {
     // Health check endpoint
     if (req.method === "GET" && url.pathname === "/health") {
       return createHealthCheckResponse("wrappedopenai", "healthy", {
-        timestamp: new Date().toISOString()
+        timestamp: nowISO()
       });
     }
 
-    console.log(`[WrappedOpenAI] Request received { url: "${req.url}", method: "${req.method}" }`);
+    logger.info({ context: 'WrappedOpenAI', message: 'Request received', url: req.url, method: req.method });
 
     const body = await this.parseRequestBody(req);
-    console.log("[WrappedOpenAI] Parsed request body:", { action: body.action, chain: body.chain });
+    logger.debug({ context: 'WrappedOpenAI', message: 'Parsed request body', action: body.action, chain: body.chain });
 
     // Handle action format
     if (body.action) {
@@ -105,26 +107,26 @@ class WrappedOpenAIHandler extends BaseHttpHandler {
         requestOptions.body = JSON.stringify(data);
       }
 
-      console.log(`[WrappedOpenAI] Making ${method} request to ${url}`);
+      logger.info({ context: 'WrappedOpenAI', message: 'Making request', method, url });
       if (data) {
-        console.log(`[WrappedOpenAI] Request data:`, JSON.stringify(data, null, 2));
+        logger.debug({ context: 'WrappedOpenAI', message: 'Request data', data });
       }
 
       const response = await fetch(url, requestOptions);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[WrappedOpenAI] API error (${response.status}):`, errorText);
+        logger.error({ context: 'WrappedOpenAI', message: 'API error', status: response.status, error: errorText });
         throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
       }
 
       const responseData = await response.json();
-      console.log(`[WrappedOpenAI] API response successful`);
+      logger.info({ context: 'WrappedOpenAI', message: 'API response successful' });
 
       return this.createSuccessResponse(responseData);
     } catch (error) {
-      console.error(`[WrappedOpenAI] Request failed:`, error);
       const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ context: 'WrappedOpenAI', message: 'Request failed', error: errorMessage });
       return this.createErrorResponse(`OpenAI request failed: ${errorMessage}`, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -134,4 +136,4 @@ class WrappedOpenAIHandler extends BaseHttpHandler {
 const wrappedOpenAIHandler = new WrappedOpenAIHandler();
 serve((req) => wrappedOpenAIHandler.handle(req));
 
-console.log("[WrappedOpenAI] Function initialized and server started.");
+logger.info({ context: 'WrappedOpenAI', message: 'Function initialized and server started' });

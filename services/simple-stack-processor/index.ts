@@ -6,6 +6,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { nowISO } from 'tasker-utils/timestamps';
 
 // Environment variables
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -28,7 +29,7 @@ const corsHeaders = {
 
 // Simple logging
 function log(level: string, message: string) {
-  console.log(`[${new Date().toISOString()}] [${level.toUpperCase()}] [SIMPLE-STACK-PROCESSOR] ${message}`);
+  console.log(`[${nowISO()}] [${level.toUpperCase()}] [SIMPLE-STACK-PROCESSOR] ${message}`);
 }
 
 // Database-based coordination to prevent concurrent execution across workers
@@ -42,7 +43,7 @@ async function tryLockTaskChain(taskRunId: number, retries: number = 3): Promise
         .from('task_locks')
         .insert({
           task_run_id: taskRunId,
-          locked_at: new Date().toISOString(),
+          locked_at: nowISO(),
           locked_by: `simple-stack-processor-${Date.now()}-${Math.random()}`
         })
         .select()
@@ -202,12 +203,12 @@ async function updateStackRunStatus(id: number, status: string, result?: any, er
   const supabase = await createSupabaseClient();
   const updates: any = {
     status,
-    updated_at: new Date().toISOString()
+    updated_at: nowISO()
   };
 
   if (result !== undefined) updates.result = result;
   if (error !== undefined) updates.error = error;
-  if (status === 'completed' || status === 'failed') updates.ended_at = new Date().toISOString();
+  if (status === 'completed' || status === 'failed') updates.ended_at = nowISO();
 
   const { data, error: updateError } = await supabase
     .from('stack_runs')
@@ -340,7 +341,7 @@ async function processServiceCall(stackRun: any) {
         .from('stack_runs')
         .update({
           waiting_on_stack_run_id: suspensionData.stackRunId,
-          updated_at: new Date().toISOString()
+          updated_at: nowISO()
         })
         .eq('id', stackRun.id);
 
@@ -367,7 +368,7 @@ async function processServiceCall(stackRun: any) {
         .from('stack_runs')
         .update({
           waiting_on_stack_run_id: result.suspensionData.stackRunId,
-          updated_at: new Date().toISOString()
+          updated_at: nowISO()
         })
         .eq('id', stackRun.id);
 
@@ -454,7 +455,7 @@ async function resumeParentTask(stackRun: any, result: any) {
       .from('stack_runs')
       .update({
         resume_payload: formattedResult,
-        updated_at: new Date().toISOString()
+        updated_at: nowISO()
       })
       .eq('id', stackRun.parent_stack_run_id);
 
@@ -612,7 +613,7 @@ async function processStackRunInternal(stackRunId: number): Promise<boolean> {
           .update({
             status: 'completed',
             result: result,
-            ended_at: new Date().toISOString()
+            ended_at: nowISO()
           })
           .eq('id', stackRun.parent_task_run_id);
         log("info", `Updated parent task run ${stackRun.parent_task_run_id} to completed`);

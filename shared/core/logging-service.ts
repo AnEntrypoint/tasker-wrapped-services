@@ -8,6 +8,7 @@
 
 // Import config service with lazy loading to avoid circular dependencies
 import type { ConfigService } from './config-service.ts';
+import { nowISO } from 'tasker-utils/timestamps';
 
 // Log level types
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -184,7 +185,7 @@ export class Logger {
     error?: Error
   ): LogEntry {
     const entry: LogEntry = {
-      timestamp: new Date().toISOString(),
+      timestamp: nowISO(),
       level,
       service: this.requestContext.service || 'unknown',
       message: this.redactSensitiveData(message),

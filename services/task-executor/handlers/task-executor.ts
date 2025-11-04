@@ -2,6 +2,7 @@ import { jsonResponse, formatErrorResponse, formatLogMessage } from "../utils/re
 import { fetchTaskFromDatabase, database, type TaskFunction } from "../services/database.ts";
 import { generateModuleCode } from "../services/module-generator.ts";
 import { createServiceRoleClient } from "../../_shared/database-service.ts";
+import { nowISO } from 'tasker-utils/timestamps';
 
 // Get supabase client from unified database service
 const supabaseClient = createServiceRoleClient();
@@ -55,8 +56,8 @@ export async function executeTask(
         task_name: taskId,
         input: input || {},
           status: 'queued',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          created_at: nowISO(),
+          updated_at: nowISO()
       }).select('id').maybeSingle();
 
         if (!insertResult || insertResult.error) {
@@ -106,7 +107,7 @@ export async function executeTask(
         await supabaseClient.from('task_runs').update({
           status: 'error',
           error: { message: errorMsg },
-          updated_at: new Date().toISOString()
+          updated_at: nowISO()
         }).eq('id', taskRunId);
 
         return jsonResponse(formatErrorResponse(errorMsg), 500);
@@ -137,8 +138,8 @@ export async function executeTask(
         await supabaseClient.from('task_runs').update({
           status: 'completed',
           result,
-          updated_at: new Date().toISOString(),
-          ended_at: new Date().toISOString()
+          updated_at: nowISO(),
+          ended_at: nowISO()
         }).eq('id', taskRunId);
         
         return jsonResponse({
@@ -164,8 +165,8 @@ export async function executeTask(
         await supabaseClient.from('task_runs').update({
           status: 'error',
           error: { message: error instanceof Error ? error.message : String(error) },
-          updated_at: new Date().toISOString(),
-          ended_at: new Date().toISOString()
+          updated_at: nowISO(),
+          ended_at: nowISO()
         }).eq('id', taskRunId);
       } catch (updateError) {
         console.log(formatLogMessage('ERROR', `Failed to update task run with error: ${updateError}`));

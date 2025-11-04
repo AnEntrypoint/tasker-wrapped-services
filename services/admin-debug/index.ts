@@ -4,6 +4,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { serve } from "https://deno.land/std@0.131.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.1";
+import { nowISO } from 'tasker-utils/timestamps';
 
 // CORS headers for the response
 const corsHeaders = {
@@ -93,7 +94,7 @@ serve(async (req) => {
           method_name: "admin.domains.list",
           args: [{ customer: "my_customer" }],
           status: "pending",
-          created_at: new Date().toISOString()
+          created_at: nowISO()
         })
         .select()
         .single();

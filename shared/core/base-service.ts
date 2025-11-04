@@ -9,6 +9,7 @@
 import { ConfigService } from './config-service.ts';
 import { logger, perf, context } from './logging-service.ts';
 import { DatabaseService } from './database-service.ts';
+import { nowISO } from 'tasker-utils/timestamps';
 
 // Service health status types
 export type ServiceHealthStatus = 'healthy' | 'unhealthy' | 'degraded';
@@ -245,7 +246,7 @@ export abstract class BaseService {
       success: true,
       data,
       metadata: {
-        timestamp: new Date().toISOString(),
+        timestamp: nowISO(),
         duration,
         requestId: context.requestId,
         version: this.serviceVersion
@@ -271,7 +272,7 @@ export abstract class BaseService {
         details: serviceError.details
       },
       metadata: {
-        timestamp: new Date().toISOString(),
+        timestamp: nowISO(),
         duration,
         requestId: context.requestId,
         version: this.serviceVersion
@@ -400,7 +401,7 @@ export abstract class BaseService {
 
       return {
         status: overallStatus,
-        timestamp: new Date().toISOString(),
+        timestamp: nowISO(),
         version: this.serviceVersion,
         details,
         performance: duration,
@@ -414,7 +415,7 @@ export abstract class BaseService {
 
       return {
         status: 'unhealthy',
-        timestamp: new Date().toISOString(),
+        timestamp: nowISO(),
         version: this.serviceVersion,
         error: (error as Error).message,
         performance: duration
@@ -507,7 +508,7 @@ export const ServiceResponse = {
     success: true,
     data,
     metadata: {
-      timestamp: new Date().toISOString(),
+      timestamp: nowISO(),
       duration: 0,
       requestId,
       version: 'unknown'
@@ -523,7 +524,7 @@ export const ServiceResponse = {
     success: false,
     error: { code, message, details },
     metadata: {
-      timestamp: new Date().toISOString(),
+      timestamp: nowISO(),
       duration: 0,
       requestId,
       version: 'unknown'

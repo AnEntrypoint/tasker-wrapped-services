@@ -4,6 +4,7 @@ import { BaseHttpHandler, HttpStatus, createHealthCheckResponse } from "../_shar
 import { config } from "../_shared/config-service.ts";
 import { BaseService, ServiceError, ServiceErrorType } from "../_shared/base-service.ts";
 import { logger } from "../_shared/logging-service.ts";
+import { nowISO } from 'tasker-utils/timestamps';
 
 // Type definitions
 interface IServerTimeResult {
@@ -184,7 +185,7 @@ class KeystoreService extends BaseService {
           // Update existing key
           wrappedResult = await this.callWrappedSupabase([
             { property: 'from', args: ['keystore'] },
-            { property: 'update', args: [{ key_value: value, updated_at: new Date().toISOString() }] },
+            { property: 'update', args: [{ key_value: value, updated_at: nowISO() }] },
             { property: 'eq', args: ['key_name', key] }
           ]);
         } else {
@@ -306,7 +307,7 @@ class KeystoreService extends BaseService {
   
   // Get the current server time
   getServerTime(): IServerTimeResult {
-    const timestamp = new Date().toISOString();
+    const timestamp = nowISO();
     return { timestamp, source: "keystore" };
   }
 

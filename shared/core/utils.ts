@@ -7,6 +7,7 @@
 
 import { hostLog as newHostLog, logger, log, perf, context } from './logging-service.ts';
 import { database, fetchTaskFromDatabase as dbFetchTaskFromDatabase, createServiceRoleClient } from './database-service.ts';
+import { nowISO } from 'tasker-utils/timestamps';
 
 // Shared type definitions
 export interface ILogEntry {
@@ -122,7 +123,7 @@ export function createApiResponse<T>(
 		success,
 		data,
 		error,
-		timestamp: new Date().toISOString()
+		timestamp: nowISO()
 	};
 
 	const response = new Response(JSON.stringify(apiData), {
@@ -156,7 +157,7 @@ export function createErrorResponse(
 		JSON.stringify({
 			error: message,
 			details: details,
-			timestamp: new Date().toISOString()
+			timestamp: nowISO()
 		}),
 		{
 			status: statusCode,
@@ -177,7 +178,7 @@ export function createSuccessResponse(
 	return new Response(
 		JSON.stringify({
 			data,
-			timestamp: new Date().toISOString()
+			timestamp: nowISO()
 		}),
 		{
 			status: statusCode,

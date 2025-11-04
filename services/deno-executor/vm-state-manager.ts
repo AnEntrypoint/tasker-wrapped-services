@@ -7,6 +7,7 @@
 // but no longer uses QuickJS - it's purely for Deno-based task state management
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { hostLog, isUuid } from "../_shared/utils.ts";
+import { nowISO } from 'tasker-utils/timestamps';
 
 // ==============================
 // Types and Interfaces
@@ -166,7 +167,7 @@ export async function saveStackRun(
       .update({
         waiting_on_stack_run_id: newStackRunId,
         status: "suspended_waiting_child",
-        updated_at: new Date().toISOString()
+        updated_at: nowISO()
       })
       .eq('id', parentStackRunId);
     
@@ -273,7 +274,7 @@ export async function updateStackRun(
   try {
     const updateData: Partial<StackRun> = {
       status,
-      updated_at: new Date().toISOString()
+      updated_at: nowISO()
     };
     
     if (result !== undefined) updateData.result = result;
@@ -381,7 +382,7 @@ export async function updateTaskRun(
   try {
     const updateData: Partial<any> = {
       status,
-      updated_at: new Date().toISOString()
+      updated_at: nowISO()
     };
 
     if (result !== undefined) updateData.result = result;
@@ -390,10 +391,10 @@ export async function updateTaskRun(
     else if (status !== 'suspended') updateData.waiting_on_stack_run_id = null;
 
     if (status === 'completed' || status === 'failed') {
-      updateData.ended_at = new Date().toISOString();
+      updateData.ended_at = nowISO();
       updateData.suspended_at = null;
     } else if (status === 'suspended') {
-      updateData.suspended_at = new Date().toISOString();
+      updateData.suspended_at = nowISO();
     }
     
     const { error: updateError } = await supabase
@@ -467,7 +468,7 @@ export function captureVMState(
     stackRunId: actualStackRunId,
     taskRunId: taskRunId || _generateUUID(),
     suspended: true,
-    suspendedAt: new Date().toISOString(),
+    suspendedAt: nowISO(),
     waitingOnStackRunId,
     taskCode: taskCode || "",
     taskName: taskName || "",
@@ -532,7 +533,7 @@ export async function prepareStackRunResumption(
         .from('stack_runs')
         .update({ 
           vm_state: updatedVmState,
-          updated_at: new Date().toISOString()
+          updated_at: nowISO()
         })
         .eq('id', parentStackRunId);
 

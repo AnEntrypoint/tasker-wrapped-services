@@ -25,6 +25,12 @@
   ],
   "author": "",
   "license": "MIT",
+  "dependencies": {
+    "tasker-http-utils": "^1.0.0",
+    "tasker-validators": "^1.0.0",
+    "tasker-logging": "^1.0.0",
+    "tasker-utils": "^1.0.0"
+  },
   "peerDependencies": {
     "tasker-sequential": "*",
     "tasker-adaptor": "*"

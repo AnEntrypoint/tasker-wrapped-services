@@ -7,6 +7,7 @@
 
 import { logger } from './logging-service.ts';
 import { config } from './config-service.ts';
+import { fetchWithRetry, parseResponse, parseResponseSafe, buildRequest, RetryConfig } from 'tasker-http-utils';
 
 // HTTP client configuration
 export interface HttpClientConfig {
@@ -168,7 +169,7 @@ export class HttpClient {
   }
 
   /**
-   * Execute HTTP request with retry logic
+   * Execute HTTP request with retry logic using tasker-http-utils
    */
   private async executeWithRetry<T>(
     url: string,
@@ -182,63 +183,16 @@ export class HttpClient {
     operationId: string
   ): Promise<HttpResponse<T>> {
     const { method, headers, body, timeout, retries } = options;
-    let lastError: Error | null = null;
 
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      if (attempt > 0) {
-        const delay = this.config.retryDelay * Math.pow(2, attempt - 1); // Exponential backoff
-        logger.debug(`HTTP retry attempt ${attempt}/${retries} for ${method} ${url}`, {
-          operationId,
-          attempt,
-          delay,
-          lastError: lastError?.message
-        });
-        await this.sleep(delay);
-      }
-
-      try {
-        const response = await this.executeRequest<T>(url, method, headers, body, timeout, operationId);
-
-        if (response.success || this.isNonRetryableStatus(response.status)) {
-          return response;
-        } else {
-          // Retry on server errors
-          lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
-          logger.warn(`HTTP request returned retryable error: ${response.status} ${response.statusText}`, {
-            operationId,
-            attempt,
-            status: response.status,
-            statusText: response.statusText
-          });
-        }
-      } catch (error) {
-        lastError = error as Error;
-        logger.warn(`HTTP request attempt ${attempt + 1} failed`, {
-          operationId,
-          attempt,
-          error: lastError.message
-        });
-      }
-    }
-
-    throw lastError || new Error('All retry attempts failed');
-  }
-
-  /**
-   * Execute single HTTP request
-   */
-  private async executeRequest<T>(
-    url: string,
-    method: string,
-    headers: Record<string, string>,
-    body: any,
-    timeout: number,
-    operationId: string
-  ): Promise<HttpResponse<T>> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const retryConfig = new RetryConfig({
+      maxRetries: retries,
+      initialDelayMs: this.config.retryDelay
+    });
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
       const requestOptions: RequestInit = {
         method,
         headers: {
@@ -256,8 +210,8 @@ export class HttpClient {
         } else {
           requestOptions.body = body;
           if (requestOptions.headers) {
-            const headers = requestOptions.headers as Record<string, string>;
-            delete headers['Content-Type']; // Let browser set it
+            const hdrs = requestOptions.headers as Record<string, string>;
+            delete hdrs['Content-Type'];
           }
         }
       }
@@ -268,62 +222,30 @@ export class HttpClient {
         hasBody: !!body
       });
 
-      const response = await fetch(url, requestOptions);
+      const response = await fetchWithRetry(url, requestOptions, retryConfig);
       clearTimeout(timeoutId);
 
-      const responseHeaders: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        responseHeaders[key] = value;
-      });
-
-      let responseData: T | undefined;
-      let responseError: string | undefined;
-
-      try {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          responseData = await response.json();
-        } else {
-          const text = await response.text();
-          if (text) {
-            try {
-              responseData = JSON.parse(text) as T;
-            } catch {
-              // Return as string if not JSON
-              responseData = text as T;
-            }
-          }
-        }
-      } catch (parseError) {
-        logger.warn(`Failed to parse response body`, {
-          operationId,
-          status: response.status,
-          error: (parseError as Error).message
-        });
-        responseError = `Failed to parse response: ${(parseError as Error).message}`;
-      }
+      const parsedResponse = await parseResponseSafe(response);
 
       const httpResponse: HttpResponse<T> = {
         success: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-        data: responseData,
-        error: responseError,
-        headers: responseHeaders
+        status: parsedResponse.status,
+        statusText: parsedResponse.statusText,
+        data: parsedResponse.data as T,
+        error: parsedResponse.error,
+        headers: parsedResponse.headers
       };
 
       logger.debug(`HTTP response received: ${response.status} ${response.statusText}`, {
         operationId,
         success: httpResponse.success,
-        hasData: !!responseData,
-        dataSize: responseData ? JSON.stringify(responseData).length : 0
+        hasData: !!parsedResponse.data,
+        dataSize: parsedResponse.data ? JSON.stringify(parsedResponse.data).length : 0
       });
 
       return httpResponse;
 
     } catch (error) {
-      clearTimeout(timeoutId);
-
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error(`Request timeout after ${timeout}ms`);
       }
@@ -411,23 +333,6 @@ export class HttpClient {
     return url.includes('tasker-external-call') || url.startsWith('https://tasker-external-call/');
   }
 
-  /**
-   * Check if HTTP status is non-retryable
-   */
-  private isNonRetryableStatus(status: number): boolean {
-    // Don't retry on client errors (4xx) except for specific cases
-    return (status >= 400 && status < 500) &&
-           status !== 408 && // Request Timeout
-           status !== 429 && // Too Many Requests
-           status !== 422;   // Unprocessable Entity
-  }
-
-  /**
-   * Sleep utility for retry delays
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 
   /**
    * Sanitize headers for logging (remove sensitive data)
@@ -521,3 +426,6 @@ export const http = {
   put: <T = any>(url: string, data?: any, options?: Omit<RequestOptions, 'method' | 'body'>) => httpClient.put<T>(url, data, options),
   delete: <T = any>(url: string, options?: Omit<RequestOptions, 'method'>) => httpClient.delete<T>(url, options)
 };
+
+// Re-export tasker-http-utils for convenience
+export { fetchWithRetry, parseResponse, parseResponseSafe, buildRequest, RetryConfig } from 'tasker-http-utils';

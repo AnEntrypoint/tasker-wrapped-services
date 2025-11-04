@@ -1,8 +1,10 @@
 /**
  * Web Search Service
- * 
+ *
  * Provides a basic web search functionality using DuckDuckGo
  */
+
+import { nowISO } from 'tasker-utils/timestamps';
 
 // Define the search result interface
 export interface SearchResult {
@@ -93,7 +95,7 @@ const websearch = {
       const response: SearchResponse = {
         query,
         results,
-        timestamp: new Date().toISOString()
+        timestamp: nowISO()
       };
       
       console.log(`WebSearch: Found ${results.length} results`);
@@ -106,7 +108,7 @@ const websearch = {
   
   getServerTime: () => {
     console.info('[INFO] [getServerTime] Getting server time');
-    return { timestamp: new Date().toISOString(), source: "websearch" };
+    return { timestamp: nowISO(), source: "websearch" };
   }
 };
 

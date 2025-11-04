@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import websearch from "./websearch-service.ts";
 import { BaseHttpHandler, HttpStatus, createHealthCheckResponse } from "../_shared/http-handler.ts";
 import { config } from "../_shared/config-service.ts";
+import { nowISO } from 'tasker-utils/timestamps';
 
 // Define type for websearch service methods
 type WebSearchService = typeof websearch;
@@ -12,7 +13,7 @@ class WrappedWebSearchHandler extends BaseHttpHandler {
     // Health check endpoint
     if (req.method === "GET" && url.pathname === "/health") {
       return createHealthCheckResponse("wrappedwebsearch", "healthy", {
-        timestamp: new Date().toISOString()
+        timestamp: nowISO()
       });
     }
 

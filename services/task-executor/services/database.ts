@@ -5,6 +5,8 @@
  * All new code should use the unified database service directly.
  */
 
+import logger from 'tasker-logging';
+import { nowISO } from 'tasker-utils/timestamps';
 import {
   database,
   fetchTaskFromDatabase as dbFetchTaskFromDatabase,
@@ -16,16 +18,16 @@ import {
 export async function fetchTaskFromDatabase(taskId?: string, taskName?: string): Promise<{ taskFunction: any, taskName: string, description: string } | null> {
   const identifier = taskId || taskName;
   if (!identifier) {
-    console.error("Database query error: Either taskId or taskName must be provided");
+    logger.error({ message: "Database query error: Either taskId or taskName must be provided" });
     return null;
   }
 
-  console.log(`[INFO] Fetching task: ${identifier}`);
+  logger.info({ message: "Fetching task", identifier });
 
   try {
     const taskData = await dbFetchTaskFromDatabase(identifier, taskId);
     if (taskData) {
-      console.log(`[INFO] Task found: ${taskData.name} (id: ${taskData.id})`);
+      logger.info({ message: "Task found", taskName: taskData.name, taskId: taskData.id });
 
       // Extract task function code and create executable function
       const taskFunction = taskData.code;
@@ -36,11 +38,11 @@ export async function fetchTaskFromDatabase(taskId?: string, taskName?: string):
         description: taskData.description || ''
       };
     } else {
-      console.log(`[INFO] No task found: ${identifier}`);
+      logger.info({ message: "No task found", identifier });
     }
     return null;
   } catch (error) {
-    console.error(`[ERROR] Database fetch error: ${error instanceof Error ? error.message : String(error)}`);
+    logger.error({ message: "Database fetch error", error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 }
@@ -50,7 +52,7 @@ export async function fetchTaskFromDatabase(taskId?: string, taskName?: string):
  */
 export async function saveTaskResult(taskId: string, result: any): Promise<boolean> {
   if (!taskId) {
-    console.error("Database error: Task ID is required");
+    logger.error({ message: "Database error: Task ID is required" });
     return false;
   }
 
@@ -60,18 +62,18 @@ export async function saveTaskResult(taskId: string, result: any): Promise<boole
       (client) => client.from('task_results').insert({
         task_id: taskId,
         result,
-        created_at: new Date().toISOString()
+        created_at: nowISO()
       })
     );
 
     if (!dbResult.success) {
-      console.error("Database save error:", dbResult.error?.message);
+      logger.error({ message: "Database save error", error: dbResult.error?.message });
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("Database save error:", error instanceof Error ? error.message : String(error));
+    logger.error({ message: "Database save error", error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 }

@@ -7,6 +7,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { type FlowStateStorage, type FlowStateStoredTask } from 'npm:flowstate@latest';
+import { nowISO } from 'tasker-utils/timestamps';
 
 // Environment variables
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -42,7 +43,7 @@ export class SupabaseFlowStateStorage implements FlowStateStorage {
       result: task.result,
       error: task.error,
       created_at: new Date(task.timestamp).toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: nowISO()
     };
 
     // Add suspension-specific fields if paused

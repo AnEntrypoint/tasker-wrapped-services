@@ -16,6 +16,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { nowISO } from 'tasker-utils/timestamps';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -75,7 +76,7 @@ export async function handler(req: Request): Promise<Response> {
     return new Response(JSON.stringify({
       success: true,
       echo: body,
-      timestamp: new Date().toISOString()
+      timestamp: nowISO()
     }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -337,7 +338,7 @@ async function startServices(servicesList, servicesDir) {
   // Create registry file in the current working directory
   const registryPath = path.join(process.cwd(), '.service-registry.json');
   fs.writeFileSync(registryPath, JSON.stringify({
-    timestamp: new Date().toISOString(),
+    timestamp: nowISO(),
     servicesDir: servicesDir,
     services: processes
   }, null, 2));

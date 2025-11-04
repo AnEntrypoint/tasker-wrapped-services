@@ -6,6 +6,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { nowISO } from 'tasker-utils/timestamps';
 
 // No imports from shared dependencies to avoid compilation errors
 
@@ -19,7 +20,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
  * Simple logging function to replace hostLog from utils
  */
 function hostLog(prefix: string, level: 'info' | 'error' | 'warn', message: string): void {
-  const timestamp = new Date().toISOString();
+  const timestamp = nowISO();
   console.log(`[${timestamp}] [${level}] [${prefix}] ${message}`);
 }
 
@@ -281,7 +282,7 @@ async function makeExternalCall(
         { property: 'update', args: [{
           status: 'suspended_waiting_child',
           waiting_on_stack_run_id: actualChildStackRunId,
-          updated_at: new Date().toISOString()
+          updated_at: nowISO()
         }] },
         { property: 'eq', args: ['id', parseInt(stackRunId)] }
       ]

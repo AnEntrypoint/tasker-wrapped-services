@@ -4,6 +4,8 @@ import { corsHeaders } from '../_shared/cors.ts'
 import { BaseHttpHandler, HttpStatus, createHealthCheckResponse } from "../_shared/http-handler.ts"
 import { config } from "../_shared/config-service.ts"
 import { serviceRegistry } from "../_shared/service-registry.ts"
+import logger from 'tasker-logging'
+import { nowISO } from 'tasker-utils/timestamps'
 
 // In-memory token cache by scope - persists between requests
 const tokenCache = new Map<string, {
@@ -33,8 +35,8 @@ async function getCredentials(): Promise<any> {
       throw new Error(`Failed to get credentials: ${result.error}`);
     }
 
-    console.log(`Got credentials response from keystore`);
-    console.log(`Credentials result structure: ${JSON.stringify({
+    logger.debug('Got credentials response from keystore');
+    logger.debug('Credentials result structure', {
       hasData: !!result.data,
       dataType: typeof result.data,
       hasDataData: !!result.data?.data,
@@ -42,22 +44,22 @@ async function getCredentials(): Promise<any> {
       hasDataDataData: !!result.data?.data?.data,
       dataDataDataType: typeof result.data?.data?.data,
       dataDataDataPreview: typeof result.data?.data?.data === 'string' ? result.data.data.data.substring(0, 50) : result.data?.data?.data
-    })}`);
+    });
 
     // Service registry triple wraps: { success, data: { success, data: { success, data: "json" } } }
     const credentialsJson = result.data?.data?.data;
 
     if (!credentialsJson || typeof credentialsJson !== 'string') {
-      console.error(`Invalid credentials format. Type: ${typeof credentialsJson}, Value: ${credentialsJson}`);
+      logger.error('Invalid credentials format', { type: typeof credentialsJson, value: credentialsJson });
       throw new Error('No credentials returned from keystore');
     }
 
     cachedCreds = JSON.parse(credentialsJson);
 
-    console.log(`Loaded credentials for ${cachedCreds.client_email}`);
+    logger.info('Loaded credentials', { clientEmail: cachedCreds.client_email });
     return cachedCreds;
   } catch (error) {
-    console.error(`Credential parsing error: ${(error as Error).message}`);
+    logger.error('Credential parsing error', { message: (error as Error).message });
     throw new Error(`Failed to parse credentials: ${(error as Error).message}`);
   }
 }
@@ -76,7 +78,7 @@ async function getAdminEmail(): Promise<string> {
       throw new Error(`Failed to get admin email: ${result.error}`);
     }
 
-    console.log(`Got admin email response from keystore`);
+    logger.debug('Got admin email response from keystore');
 
     // Service registry triple wraps: { success, data: { success, data: { success, data: "email" } } }
     const emailValue = result.data?.data?.data;
@@ -86,10 +88,10 @@ async function getAdminEmail(): Promise<string> {
     }
 
     cachedAdminEmail = emailValue;
-    console.log(`Loaded admin email: ${cachedAdminEmail}`);
+    logger.info('Loaded admin email', { email: cachedAdminEmail });
     return cachedAdminEmail;
   } catch (error) {
-    console.error(`Admin email parsing error: ${(error as Error).message}`);
+    logger.error('Admin email parsing error', { message: (error as Error).message });
     throw new Error(`Failed to parse admin email: ${(error as Error).message}`);
   }
 }
@@ -108,17 +110,17 @@ async function getAccessToken(scopes: string[], impersonateUser?: string): Promi
   const cachedData = tokenCache.get(scopeKey);
 
   if (cachedData && cachedData.expiry > now + TOKEN_REFRESH_BUFFER) {
-    console.log(`Using cached token for ${scopeKey}`);
+    logger.debug('Using cached token', { scopeKey });
     return cachedData.token;
   }
 
-  console.log(`Generating new token for ${scopeKey}`);
+  logger.debug('Generating new token', { scopeKey });
   const creds = await getCredentials();
   const adminEmail = await getAdminEmail();
 
   // Use impersonation user if specified, otherwise use admin email
   const subjectEmail = impersonateUser || adminEmail;
-  console.log(`Impersonating user: ${subjectEmail}`);
+  logger.debug('Impersonating user', { subjectEmail });
 
   try {
     // Create JWT assertion for OAuth 2.0 flow
@@ -165,7 +167,7 @@ async function getAccessToken(scopes: string[], impersonateUser?: string): Promi
     const jwt = `${jwtData}.${signature}`;
 
     // Exchange JWT for access token
-    console.log('Exchanging JWT for access token...');
+    logger.debug('Exchanging JWT for access token');
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
@@ -196,11 +198,11 @@ async function getAccessToken(scopes: string[], impersonateUser?: string): Promi
     });
 
     const expiryDate = new Date(expiresAt).toISOString();
-    console.log(`Generated new token, expires at ${expiryDate}`);
+    logger.info('Generated new token', { expiresAt: expiryDate });
     return tokenData.access_token;
 
   } catch (error) {
-    console.error(`Token generation failed:`, error);
+    logger.error('Token generation failed', { error: (error as Error).message });
     throw new Error(`Failed to generate access token: ${(error as Error).message}`);
   }
 }
@@ -212,17 +214,17 @@ class WrappedGapiHandler extends BaseHttpHandler {
     if (url.pathname.endsWith('/health')) {
       return createHealthCheckResponse("wrappedgapi", "healthy", {
         cache_size: tokenCache.size,
-        timestamp: new Date().toISOString()
+        timestamp: nowISO()
       });
     }
   
     try {
       // Get request body - read as text first to avoid consuming it
-      console.log('🔍 [TRACE] About to read request body...');
+      logger.debug('About to read request body');
       const bodyText = await req.text().catch(() => '{"method":"unknown"}');
-      console.log('🔍 [TRACE] Request body read successfully, length:', bodyText.length);
+      logger.debug('Request body read successfully', { length: bodyText.length });
       const body = JSON.parse(bodyText);
-      console.log('🔍 [TRACE] Request body parsed, method:', body?.method);
+      logger.debug('Request body parsed', { method: body?.method });
     
     // Echo for testing
     if (body?.method === 'echo') {
@@ -237,14 +239,14 @@ class WrappedGapiHandler extends BaseHttpHandler {
         body.chain[1]?.property === 'getStepData') {
       
       const args = body.chain[1]?.args?.[0] || {};
-      console.log(`Test getStepData called with:`, args);
+      logger.debug('Test getStepData called', { args });
       
       return new Response(
         JSON.stringify({
           stepNumber: args.stepNumber,
           timestamp: args.timestamp,
           testData: `Step ${args.stepNumber} data`,
-          responseAt: new Date().toISOString()
+          responseAt: nowISO()
         }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
@@ -261,7 +263,7 @@ class WrappedGapiHandler extends BaseHttpHandler {
             status: 'ok',
             adminEmail: adminEmail,
             clientEmail: creds.client_email,
-            timestamp: new Date().toISOString()
+            timestamp: nowISO()
           }),
           { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
@@ -270,13 +272,13 @@ class WrappedGapiHandler extends BaseHttpHandler {
           JSON.stringify({
             status: 'error',
             error: (error as Error).message,
-            timestamp: new Date().toISOString()
+            timestamp: nowISO()
           }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
     }
-    
+
     // Handle token info - returns info about cached tokens
     if (body?.method === 'getTokenInfo') {
       const tokenInfo = Array.from(tokenCache.entries()).map(([scope, data]) => ({
@@ -289,7 +291,7 @@ class WrappedGapiHandler extends BaseHttpHandler {
         JSON.stringify({
           tokens: tokenInfo,
           count: tokenInfo.length,
-          timestamp: new Date().toISOString()
+          timestamp: nowISO()
         }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
@@ -305,17 +307,17 @@ class WrappedGapiHandler extends BaseHttpHandler {
           JSON.stringify({
             status: 'ok',
             message: `Cleared token cache for scope: ${scope}`,
-            timestamp: new Date().toISOString()
+            timestamp: nowISO()
           }),
           { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       } else {
         tokenCache.clear();
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             status: 'ok',
             message: 'Cleared all token caches',
-            timestamp: new Date().toISOString()
+            timestamp: nowISO()
           }),
           { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
@@ -347,15 +349,15 @@ class WrappedGapiHandler extends BaseHttpHandler {
           if (customerArgs.customer === adminEmail) {
             // If someone passed the admin email as customer, convert it to my_customer
             customerId = 'my_customer';
-            console.log(`Converting admin email to my_customer`);
+            logger.debug('Converting admin email to my_customer');
           } else {
             customerId = encodeURIComponent(customerArgs.customer);
           }
         } else {
           customerId = 'my_customer';
         }
-        
-        console.log(`Using customer ID: ${customerId}`);
+
+        logger.debug('Using customer ID', { customerId });
         
 
         
@@ -367,42 +369,42 @@ class WrappedGapiHandler extends BaseHttpHandler {
             'Accept': 'application/json'
           }
         });
-        
+
         // Read response body once to avoid "Body already consumed" error
-        console.log('🔍 [TRACE] Reading Google API response body...');
+        logger.debug('Reading Google API response body');
         const responseBody = await response.text();
-        console.log('🔍 [TRACE] Response body read, status:', response.status);
+        logger.debug('Response body read', { status: response.status });
         
         if (response.ok) {
           // Parse as JSON for successful responses
           const data = JSON.parse(responseBody);
-          console.log('🔍 [TRACE] Response parsed successfully');
-          
+          logger.debug('Response parsed successfully');
+
           // Clean response - return only the domains data without Google API metadata
           const cleanedResponse = {
             domains: data.domains || []
           };
-          
-          console.log(`🔍 [TRACE] Returning cleaned domains response with ${cleanedResponse.domains.length} domains`);
+
+          logger.debug('Returning cleaned domains response', { count: cleanedResponse.domains.length });
           return new Response(
             JSON.stringify(cleanedResponse),
             { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
           );
         } else {
-          console.log('🔍 [TRACE] API error response:', responseBody);
+          logger.debug('API error response', { body: responseBody });
           throw new Error(`Google API returned ${response.status}: ${responseBody}`);
         }
       } catch (error) {
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             error: `Domain list error: ${(error as Error).message}`,
-            timestamp: new Date().toISOString() 
+            timestamp: nowISO()
           }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
     }
-    
+
     // Admin users direct implementation with token caching
     if (body?.chain?.[0]?.property === 'admin' && 
         body.chain[1]?.property === 'users' && 
@@ -426,7 +428,7 @@ class WrappedGapiHandler extends BaseHttpHandler {
         // Add domain parameter if specified
         if (usersArgs.domain) {
           queryParams.set('domain', usersArgs.domain);
-          console.log(`Filtering users by domain: ${usersArgs.domain}`);
+          logger.debug('Filtering users by domain', { domain: usersArgs.domain });
         }
         
         // Add maxResults parameter if specified (default to 100 if not specified)
@@ -459,8 +461,8 @@ class WrappedGapiHandler extends BaseHttpHandler {
         if (usersArgs.viewType) {
           queryParams.set('viewType', usersArgs.viewType);
         }
-        
-        console.log(`Listing users with params: ${queryParams.toString()}`);
+
+        logger.debug('Listing users with params', { params: queryParams.toString() });
         
 
         
@@ -472,42 +474,42 @@ class WrappedGapiHandler extends BaseHttpHandler {
             'Accept': 'application/json'
           }
         });
-        
+
         // Read response body once to avoid "Body already consumed" error
-        console.log('🔍 [TRACE] Reading Google API response body...');
+        logger.debug('Reading Google API response body');
         const responseBody = await response.text();
-        console.log('🔍 [TRACE] Response body read, status:', response.status);
+        logger.debug('Response body read', { status: response.status });
         
         if (response.ok) {
           // Parse as JSON for successful responses
           const data = JSON.parse(responseBody);
-          console.log('🔍 [TRACE] Response parsed successfully');
-          
+          logger.debug('Response parsed successfully');
+
           // Clean response - return only the users data without Google API metadata
           const cleanedResponse = {
             users: data.users || []
           };
-          
-          console.log(`🔍 [TRACE] Returning cleaned users response with ${cleanedResponse.users.length} users`);
+
+          logger.debug('Returning cleaned users response', { count: cleanedResponse.users.length });
           return new Response(
             JSON.stringify(cleanedResponse),
             { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
           );
         } else {
-          console.log('🔍 [TRACE] API error response:', responseBody);
+          logger.debug('API error response', { body: responseBody });
           throw new Error(`Google API returned ${response.status}: ${responseBody}`);
         }
       } catch (error) {
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             error: `User list error: ${(error as Error).message}`,
-            timestamp: new Date().toISOString() 
+            timestamp: nowISO()
           }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
     }
-    
+
     // Gmail messages direct implementation with token caching
     if (body?.chain?.[0]?.property === 'gmail' && 
         body.chain[1]?.property === 'users' && 
@@ -540,8 +542,8 @@ class WrappedGapiHandler extends BaseHttpHandler {
         if (listArgs.labelIds) {
           queryParams.set('labelIds', listArgs.labelIds.join(','));
         }
-        
-        console.log(`Listing Gmail messages for user ${userId} with params: ${queryParams.toString()}`);
+
+        logger.debug('Listing Gmail messages', { userId, params: queryParams.toString() });
         
 
         
@@ -553,32 +555,32 @@ class WrappedGapiHandler extends BaseHttpHandler {
             'Accept': 'application/json'
           }
         });
-        
+
         const responseBody = await response.text();
-        console.log('Gmail API response status:', response.status);
-        
+        logger.debug('Gmail API response', { status: response.status });
+
         if (response.ok) {
           const data = JSON.parse(responseBody);
-          console.log('Gmail messages list success');
+          logger.debug('Gmail messages list success');
           return new Response(
             JSON.stringify(data),
             { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
           );
         } else {
-          console.log('Gmail API error response:', responseBody);
+          logger.debug('Gmail API error response', { body: responseBody });
           throw new Error(`Gmail API returned ${response.status}: ${responseBody}`);
         }
       } catch (error) {
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             error: `Gmail messages list error: ${(error as Error).message}`,
-            timestamp: new Date().toISOString() 
+            timestamp: nowISO()
           }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
     }
-    
+
     // Gmail message get direct implementation with token caching
     if (body?.chain?.[0]?.property === 'gmail' && 
         body.chain[1]?.property === 'users' && 
@@ -610,8 +612,8 @@ class WrappedGapiHandler extends BaseHttpHandler {
         if (getArgs.metadataHeaders) {
           queryParams.set('metadataHeaders', getArgs.metadataHeaders.join(','));
         }
-        
-        console.log(`Getting Gmail message ${messageId} for user ${userId} with params: ${queryParams.toString()}`);
+
+        logger.debug('Getting Gmail message', { messageId, userId, params: queryParams.toString() });
         
 
         
@@ -623,35 +625,35 @@ class WrappedGapiHandler extends BaseHttpHandler {
             'Accept': 'application/json'
           }
         });
-        
+
         const responseBody = await response.text();
-        console.log('Gmail API response status:', response.status);
-        
+        logger.debug('Gmail API response', { status: response.status });
+
         if (response.ok) {
           const data = JSON.parse(responseBody);
-          console.log('Gmail message get success');
+          logger.debug('Gmail message get success');
           return new Response(
             JSON.stringify(data),
             { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
           );
         } else {
-          console.log('Gmail API error response:', responseBody);
+          logger.debug('Gmail API error response', { body: responseBody });
           throw new Error(`Gmail API returned ${response.status}: ${responseBody}`);
         }
       } catch (error) {
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             error: `Gmail message get error: ${(error as Error).message}`,
-            timestamp: new Date().toISOString() 
+            timestamp: nowISO()
           }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
     }
-    
+
     // For all other Google API requests, handle manually
     // Since we removed the SDK processor, we only support the direct implementations above
-    console.log('🔍 [TRACE] No direct implementation found for request, returning error...');
+    logger.debug('No direct implementation found for request, returning error');
 
     return new Response(
       JSON.stringify({
@@ -668,7 +670,7 @@ class WrappedGapiHandler extends BaseHttpHandler {
           'getTokenInfo',
           'clearTokenCache'
         ],
-        timestamp: new Date().toISOString()
+        timestamp: nowISO()
       }),
       { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
