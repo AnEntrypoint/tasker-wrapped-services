@@ -1,14 +1,14 @@
 {
-  "name": "tasker-wrapped-services",
+  "name": "sequential-wrapped-services",
   "version": "1.1.0",
-  "description": "Runtime-agnostic wrapped services for tasker-sequential (Google APIs, keystore, database, etc.)",
+  "description": "Runtime-agnostic wrapped services for sequential-runner (Google APIs, keystore, database, etc.)",
   "type": "module",
   "main": "cli.js",
   "exports": {
     ".": "./cli.js"
   },
   "bin": {
-    "tasker": "./cli.js"
+    "sequential": "./cli.js"
   },
   "scripts": {
     "start": "node cli.js",
@@ -17,7 +17,6 @@
     "discover": "node discover-services.js"
   },
   "keywords": [
-    "tasker",
     "sequential",
     "wrapped",
     "services",
@@ -26,14 +25,14 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "tasker-http-utils": "^1.0.0",
-    "tasker-validators": "^1.0.0",
-    "tasker-logging": "^1.0.0",
-    "tasker-utils": "^1.0.0"
+    "sequential-http-utils": "^1.0.0",
+    "sequential-validators": "^1.0.0",
+    "sequential-logging": "^1.0.0",
+    "sequential-utils": "^1.0.0"
   },
   "peerDependencies": {
-    "tasker-sequential": "*",
-    "tasker-adaptor": "*"
+    "sequential-runner": "*",
+    "sequential-adaptor": "*"
   },
   "devDependencies": {
     "dotenv": "^16.4.7"
